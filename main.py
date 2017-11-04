@@ -19,8 +19,8 @@ class Peer2PeerNetwork():
         self.maxConnections = maxConnections
         self.maxPeers = maxPeers
         self.peerIdGenerator = GeneratePeerID()
-
-        
+        self.localFileTable = {} # contains tuple fileName, file path, 
+        self.peerFileTable = {} # stores the tuple fileName, list of peers having the file
     def main(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR,1)
@@ -44,7 +44,14 @@ class Peer2PeerNetwork():
                 sock.close()
                 sys.exit()
         
- 
+    def sendData(self,peerAddress,data):
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect(peerAddress)
+        sock.sendall(data)
+        sock.close()
+
+
+
     def addPeer(self, pid, peerAddress):
         if not peerAddress in self.peers.values():
             if len(self.peers) < self.maxPeers:
@@ -69,6 +76,37 @@ class Peer2PeerNetwork():
     def handlePeerConnection(self,connection, peerAddress):
         pass
 
+    def initializeLocalFileTable():
+        pass
+
+    def addToLocalFileTable(self,fileName,filePath):
+        if not fileName in self.localFileTable:
+            self.localFileTable[fileName] = filePath
+        
+
+    def delFromLocalFileTable(self,fileName):
+        if fileName in self.localFileTable:
+            self.localFileTable.pop(fileName)
+        
+
+    def initializePeerFileTable():
+        pass
+
+    def addToPeerFileTable(self, fileName, peerAddress):
+        if fileName in self.peerFileTable:
+            self.peerFileTable[fileName].append(peerAddress)
+        else:
+            self.peerFileTable[fileName] = [peerAddress]
+
+    def delFromPeerFileTable(self, peerAddress, fileName = None):
+        if fileName is None:
+            for i in self.peerFileTable:
+                if peerAddress in self.peerFileTable[i]:
+                    self.peerFileTable[i].remove(peerAddress)
+        else:
+            if peerAddress in self.peerFileTable[fileName]:
+                self.peerFileTable[fileName].remove(peerAddress)
+
 class GeneratePeerID():
     def __init__(self):
         self.id = 0
@@ -76,6 +114,3 @@ class GeneratePeerID():
     def getID(self):
         self.id +=1
         return self.id
-
-obj = Peer2PeerNetwork()
-obj.main()
