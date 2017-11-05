@@ -2,6 +2,8 @@ import socket
 from thread import *
 import sys
 import signal
+import struct
+import time
 
 maxLengthExceededError = "123"
 peerNotFound = "124"
@@ -22,12 +24,12 @@ class Peer2PeerNetwork():
         self.localFileTable = {} # contains tuple fileName, file path, 
         self.peerFileTable = {} # stores the tuple fileName, list of peers having the file
         self.handlers = {"NAME":self.handleName, "LIST":self.handleList, "JOIN":self.handleJoin, "Quer":self.handleQuer, "RESP":self.handleResp, "FGET":self.handleFget, "QUIT":self.handleQuit, "REPL":self.handleRepl, "ERRO":self.handleErro}
-        self.myId = (host, port)
+        self.myId = (self.host, self.port)
 
 
     def handlePeerConnection(self, clientSocket, peerAddress):
         (host, port) = peerAddress
-        peerconn = PeerConnection(None, host, port, clientSocket)
+        peerconn = PeerConnection((host, port), sock = clientSocket)
         try:
             msgType, msgData = peerconn.recvData()
         except:
@@ -87,6 +89,24 @@ class Peer2PeerNetwork():
             printDebugMessages(e)
             sys.exit()
         sock.listen(5)
+        # time.sleep(2)
+        # if self.port == 1234:
+        #     peerconn1 = PeerConnection(('', 1235))
+        #     self.addPeer(self.peerIdGenerator.getID(), ('', 1235))
+        #     print("[peerConnection]  sending data")
+        #     peerconn1.sendData("test", "Hi, did you recieve the message")
+        #     print("[peerConnection]  sent data")
+        # elif self.port == 1235:
+        #     connection,peer = sock.accept()
+        #     self.addPeer(self.peerIdGenerator.getID(), peer)
+        #     peerconn2 = PeerConnection(('', 1234), sock = connection)
+        #     print("[peerConnection]  recieving data")
+        #     print(peerconn2.recvData())
+        #     print("[peerConnection]  recieved data")
+
+        # self.scheduler()
+        start_new_thread(self.scheduler,())
+            
         while(1):
             try:
                 connection, peerAddress = sock.accept()
@@ -100,11 +120,11 @@ class Peer2PeerNetwork():
                 sock.close()
                 sys.exit()
         
-    def sendData(self,peerAddress,data):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect(peerAddress)
-        sock.sendall(data)
-        sock.close()
+    # def sendData(self,peerAddress,data):
+    #     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    #     sock.connect(peerAddress)
+    #     sock.sendall(data)
+    #     sock.close()
 
 
 
@@ -128,9 +148,6 @@ class Peer2PeerNetwork():
 
     def getPeerIds(self):
         return self.peers.keys()
-
-    def handlePeerConnection(self,connection, peerAddress):
-        pass
 
     def initializeLocalFileTable():
         pass
@@ -358,6 +375,27 @@ class Peer2PeerNetwork():
         except:
             print("Error in building peer list")
         
+    def refreshPeerList(self):
+        removePeerList = []
+        print(self.peers)
+        print("in refreshPeerList")
+        for i in self.peers:
+            try:
+                conn = PeerConnection(self.peers[i])
+                print("connection still active", self.peers[i])
+                conn.close()
+            except:
+                removePeerList.append(i)
+                print("Adding lazy connection", self.peers[i])
+        for i in removePeerList:
+            self.delFromPeerFileTable(self.peers[i])
+            print("removing inactive peer", self.peers[i])
+            self.peers.pop(i)
+
+    def scheduler(self):
+        while(1):
+            self.refreshPeerList()
+            time.sleep(5)
 
 
 class GeneratePeerID():
@@ -367,3 +405,22 @@ class GeneratePeerID():
     def getID(self):
         self.id +=1
         return self.id
+
+class PeerConnection():
+    def __init__(self, peerAddress, sock = None):
+        if sock:
+            self.sock = sock
+        else:
+            self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.sock.connect(peerAddress)
+
+    def sendData(self,msgType, data):
+        self.sock.sendall(str(msgType) + str(data))
+
+    def recvData(self):
+        data = self.sock.recv(65535)
+        return (data[0:4], data[4:])
+
+    def close(self):
+        self.sock.close()
+
