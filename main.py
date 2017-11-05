@@ -189,7 +189,7 @@ class Peer2PeerNetwork():
     def handleName(self, peerconn):
         """ Returns the official peerID """
         try:
-            peerconn.sendData("REPL", self.myId)
+            peerconn.sendData("REPL", "%s %d"%(self.myId[0], self.myId[1]))
         except:
             print("Error in sending myId in handleName...")
 
@@ -247,7 +247,10 @@ class Peer2PeerNetwork():
             peerDict = self.getDictofPeers()
             for pid in peerDict:
                 (host, port) = peerDict[pid]
-                self.sendToPeer("Quer", host, port, msdData)
+                conn1 = PeerConnection(host, port)
+                conn1.sendData("QUER", msdData)
+                conn1.close()
+                # self.sendToPeer("Quer", host, port, msdData)
 
     def handleResp(self, data):
         """ Add the queried response file to to my dict of known files """
@@ -305,10 +308,56 @@ class Peer2PeerNetwork():
         print("Error received: %s", error)
 
 
+    def buildPeerList(self, host, port, hops = 1):
+        """ Build the list of known peers upto the maximum number allowed """
+        if hops <= 0:
+            return
+        if self.getMaxPeers() >= self.getNumPeers():
+            return
+        try:
+            conn1 = PeerConnection(host, port)
+            try:
+                conn1.sendData("NAME", "")
+            except:
+                print("Error sending the NAME query...")
+            try:
+                msgType, msgData = conn1.recvData()
+                if msgType != "NAME":
+                    raise
+            except:
+                print("Error receiving the response of the NAME query")
+            recvHoost, recvPort = msgData.split()
+            recvPort = int(recvPort)
+            self.addPeer(self.GeneratePeerID(), (recvHoost, recvPort))
 
+            # Do recursive depth first search to add more peers
+            try:
+                conn1.sendData("LIST", "")
+            except:
+                print("Error in seding the LIST query...")
+            try:
+                msgType, msgData = conn1.recvData()
+                if msgType != "REPL":
+                    raise
+                npeers = int(msgData) # number of peers it knows
+                for i in range(npeers):
+                    msgType, msgData = conn1.recvData()
+                    if msgType != "REPL":
+                        raise
+                    pid, recvHoost, recvPort = msgData.split()
+                    recvPort = int(recvPort)
+                    self.addPeer(pid, (recvHoost, recvPort)) 
+            conn1.close()
+            except:
+                print("Error in receiving the peer List...")
+            
+            myPeerDict = self.getDictofPeers()
+            for pid in myPeerDict:
+                self.buildPeerList(myPeerDict[0], myPeerDict[1], hops-1)
 
-
-
+        except:
+            print("Error in building peer list")
+        
 
 
 class GeneratePeerID():
