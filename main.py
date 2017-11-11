@@ -6,6 +6,10 @@ import struct
 import time
 import os
 
+
+seperator1 = "#"
+seperator2 = "$"
+
 maxLengthExceededError = "123"
 peerNotFound = "124"
 def printDebugMessages(error):
@@ -24,7 +28,7 @@ class Peer2PeerNetwork():
         self.peerIdGenerator = GeneratePeerID()
         self.localFileTable = {} # contains tuple fileName, file path, 
         self.peerFileTable = {} # stores the tuple fileName, list of peers having the file
-        self.handlers = {"NAME":self.handleName, "LIST":self.handleList, "JOIN":self.handleJoin, "Quer":self.handleQuer, "RESP":self.handleResp, "FGET":self.handleFget, "QUIT":self.handleQuit, "REPL":self.handleRepl, "ERRO":self.handleErro}
+        self.handlers = {"NAME":self.handleName, "LIST":self.handleList, "JOIN":self.handleJoin, "QUER":self.handleQuer, "RESP":self.handleResp, "FGET":self.handleFget, "QUIT":self.handleQuit, "REPL":self.handleRepl, "ERRO":self.handleErro}
         self.myId = (self.host, self.port)
 
 
@@ -38,6 +42,7 @@ class Peer2PeerNetwork():
         try:
             print("recieving data")
             data2 = clientSocket.recv(1024)
+            print("data2 is ", data2)
             msgType, msgData = data2.split()
             print("messageType and message data are", msgType, msgData)
         except:
@@ -72,10 +77,10 @@ class Peer2PeerNetwork():
             except:
                 print("Invalid message type for join...")
             self.handleJoin(peerconn, host, port)
-        if msgType == "Quer":
+        if msgType == "QUER":
             """ Assuming the message is of the form queryFile ttl host port """
             try:
-                queryFile, ttl, host, port = msgData.split()
+                queryFile, ttl, host, port = msgData.split(":")
                 port = int(port)
                 ttl = int(ttl)
                 peerconn = PeerConnection(peerAddress = (host, int(port)))
@@ -87,7 +92,7 @@ class Peer2PeerNetwork():
             self.handleResp(msgData)
         if msgType == "FGET":
             """ Assuming the msgData is same as the filename """
-             try:
+            try:
                 (host, port, filename) = msgData.split()
             except:
                 print("error in splitting data")
@@ -112,6 +117,7 @@ class Peer2PeerNetwork():
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR,1)
         try:
+            print(self.host, self.port)
             sock.bind((self.host, self.port))
             print("binding succesfull")
         except socket.error,e:
@@ -234,14 +240,14 @@ class Peer2PeerNetwork():
 
 
 
-    def handleName(self, peerconn):
+    def handleName(self, peerconn):  # [TODO]
         """ Returns the official peerID """
         try:
-            peerconn.sendData("REPL", "%s %d"%(self.myId[0], self.myId[1]))
+            peerconn.sendData("REPL", "%s%s%d"%(self.myId[0], seperator2, self.myId[1]))
         except:
             print("Error in sending myId in handleName...")
 
-    def handleList(self, peerconn):
+    def handleList(self, peerconn):  # [TODO]
         """ Returns the list of known peers """
         try:
             peerconn.sendData("REPL", "%d"%(self.getNumPeers()))
@@ -251,7 +257,7 @@ class Peer2PeerNetwork():
         for pid in peerList:
             (host, port) = peerList[pid]
             try:
-                peerconn.sendData("REPL", "%s %s %d"%(pid, host, port))
+                peerconn.sendData("REPL", "%s%s%s%s%d"%(pid, seperator2, host, seperator2, port))
             except:
                 print("Error in sending the peer List data in handleList...")
     
@@ -260,7 +266,7 @@ class Peer2PeerNetwork():
         peerList = self.getDictofPeers()
         if self.getMaxPeers() >= self.getNumPeers():
             try:
-                peerconn.sendData("ERRO", "Maximum limit reached. So can't add %s %d"%(host, port))
+                peerconn.sendData("ERRO", "Maximum limit reached. So can't add%s%s%s%d"%(seperator2, host, seperator2, port))
             except:
                 print("Cannot send the error message that maximum number of peers reached...")
             return
@@ -277,7 +283,7 @@ class Peer2PeerNetwork():
                 foundPort = self.getMyPort()
                 break
         if foundHost != None:
-            peerconn.sendData("RESP", "%s %s %d"%(filename, foundHost, foundPort))
+            peerconn.sendData("RESP", "%s%s%s%s%d"%(filename, seperator2,foundHost, seperator2,foundPort))
             return
 
         for filename in fileDict:
@@ -286,12 +292,12 @@ class Peer2PeerNetwork():
                 break
         
         if foundHost != None:
-            peerconn.sendData("RESP", "%s %s %d"%(filename, foundHost, foundPort))
+            peerconn.sendData("RESP", "%s%s%s%s%d"%(filename, seperator2,foundHost, seperator2,foundPort))
             return
 
         # Coming here means no idea about the file. So broadcasting to neighbouring peers for the file
         if ttl > 0:
-            msdData = "%s %d %s %d"%(queryFile, ttl-1, host, port)
+            msdData = "%s%s%d%s%s%s%d"%(queryFile, seperator2, ttl-1, seperator2, host, seperator2, port)
             peerDict = self.getDictofPeers()
             for pid in peerDict:
                 (host, port) = peerDict[pid]
@@ -314,7 +320,7 @@ class Peer2PeerNetwork():
         except:
             print("File not found...")
         fdata = f.read()
-        fdata += "[saket,anil,abhishek]"
+        fdata += seperator2
         fdata += filename
         try:
             peerconn.sendData("REPL", fdata)
@@ -446,7 +452,7 @@ class PeerConnection():
             self.sock.connect(peerAddress)
 
     def sendData(self,msgType, data):
-        self.sock.send(str(msgType) + str(data))
+        self.sock.send(str(msgType) + seperator1 + str(data))
 
     def recvData(self):
         data = self.sock.recv(65535)

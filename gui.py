@@ -4,6 +4,7 @@ import socket
 from Tkinter import *
 from random import *
 from main import *
+from thread import *
 
 class GUI(Frame):
     def __init__( self,firstpeer,serverport,master=None):
@@ -20,8 +21,11 @@ class GUI(Frame):
         self.p2pnetwork.addPeer(1,(host,port))
         self.updatePeerList()
         print "Thread to Be started"
-        t = threading.Thread( target = self.p2pnetwork.main, args = [] )
-        t.start()
+
+        # t = threading.Thread( target = self.p2pnetwork.main, args = [] )
+        # t.start()
+        
+        start_new_thread(self.p2pnetwork.main,())
 
     def updatePeerList( self ):
         if self.peerList.size() > 0:
@@ -65,13 +69,13 @@ class GUI(Frame):
 
       for p in self.p2pnetwork.getPeerIds():
         print self.p2pnetwork.myId
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect(('',1234))
-        sock.send("ERRO sending error msg")
-        # peerconn = PeerConnection(peerAddress = self.p2pnetwork.myId)
+        # sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # sock.connect(('',1234))
+        # sock.send("ERRO sendingerrormsg")
+        peerconn = PeerConnection(peerAddress = self.p2pnetwork.myId)
         # time.sleep(2)
-        # # peerconn = self.p2pnetwork.PeerConnection(peerAddress = self.myId)
-        # peerconn.sendData("QUER",key+" 2"+" "+self.p2pnetwork.host+" "+str(self.p2pnetwork.port))
+        # peerconn = self.p2pnetwork.PeerConnection(peerAddress = self.myId)
+        peerconn.sendData("QUER",key+":2:"+self.p2pnetwork.host+":"+str(self.p2pnetwork.port))
         # self.p2pnetwork.sendtopeer( p, QUERY, "%s %s 4" % ( self.btpeer.myid, key ) )
 
 
