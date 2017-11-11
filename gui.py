@@ -6,6 +6,9 @@ from random import *
 from main import *
 from thread import *
 
+seperator1 = "#"
+seperator2 = "$"
+
 class GUI(Frame):
     def __init__( self,firstpeer,serverport,master=None):
         Frame.__init__(self,master)
@@ -46,18 +49,19 @@ class GUI(Frame):
     def updatePeerFileList( self ):
         if self.peerfileList.size() > 0:
             self.peerfileList.delete(0, self.peerfileList.size() - 1)
+            print self.p2pnetwork.getDictOfFiles()
         for f in self.p2pnetwork.peerFileTable:
             # print f 
             p = self.p2pnetwork.peerFileTable[f]
             if not p:
                 p = '(peer)'
-            self.fileList.insert( END, "%s:%s" % (f,p) )
+            self.peerfileList.insert( END, "%s:%s" % (f,p) )
 
     def onAdd(self):
       file = self.addfileEntry.get()
       if file.lstrip().rstrip():
          filename = file.lstrip().rstrip()
-         self.p2pnetwork.addToLocalFileTable( filename,"./localFiles"+filename )
+         self.p2pnetwork.addToLocalFileTable( filename,"./localFiles/"+filename )
       self.addfileEntry.delete( 0, len(file) )
       self.updateFileList()
 
@@ -75,22 +79,24 @@ class GUI(Frame):
         peerconn = PeerConnection(peerAddress = self.p2pnetwork.myId)
         # time.sleep(2)
         # peerconn = self.p2pnetwork.PeerConnection(peerAddress = self.myId)
-        peerconn.sendData("QUER",key+":2:"+self.p2pnetwork.host+":"+str(self.p2pnetwork.port))
+        peerconn.sendData("QUER", key+ seperator2 +"2" + seperator2 + self.p2pnetwork.host + seperator2 + str(self.p2pnetwork.port))
         # self.p2pnetwork.sendtopeer( p, QUERY, "%s %s 4" % ( self.btpeer.myid, key ) )
 
 
     def onFetch(self):
-      sels = self.fileList.curselection()
-      if len(sels)==1:
-         sel = self.fileList.get(sels[0]).split(':')
-         if len(sel) > 2:  # fname:host:port
-            fname,host,port = sel
-            # resp = self.btpeer.connectandsend( host, port, FILEGET, fname )
-            if len(resp) and resp[0][0] == REPLY:
-               fd = file( fname, 'w' )
-               fd.write( resp[0][1] )
-               fd.close()
-               self.p2pnetwork.localFileTable[fname] = "./localFiles"+fname  # because it's local now
+      sels = self.peerfileList.curselection()
+      data = self.peerfileList.get(sels[0])
+      print(data)
+      filename,temp1 = data.split(":")
+      host,port  = eval(temp1)
+      peerconn = PeerConnection(peerAddress = (host,int(port)))
+      peerconn.sendData("FGET",self.p2pnetwork.host  + seperator2 + str(self.p2pnetwork.port) + seperator2 + filename)
+      # resp = self.btpeer.connectandsend( host, port, FILEGET, fname )
+      # if len(resp) and resp[0][0] == REPLY:
+      #    fd = file( fname, 'w' )
+      #    fd.write( resp[0][1] )
+      #    fd.close()
+      #    self.p2pnetwork.localFileTable[fname] = "./localFiles"+fname  # because it's local now
 
 
     def onRemove(self):
@@ -104,6 +110,7 @@ class GUI(Frame):
     def onRefresh(self):
         self.updatePeerList()
         self.updateFileList()
+        self.updatePeerFileList()
         # Update Peer File List HERE 
         # self.peerfileList.insert( END, 'a', 'b', 'c', 'd', 'e', 'f', 'g' )
 
@@ -153,7 +160,7 @@ class GUI(Frame):
         peerfileScroll["command"] = self.peerfileList.yview
 
         self.fetchButton = Button( peerfileFrame, text='Fetch',
-                          command=self.onRefresh)
+                          command=self.onFetch)
         self.fetchButton.grid()
 
         self.addfileEntry = Entry(addfileFrame, width=25)

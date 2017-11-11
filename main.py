@@ -43,11 +43,11 @@ class Peer2PeerNetwork():
             print("recieving data")
             data2 = clientSocket.recv(1024)
             print("data2 is ", data2)
-            msgType, msgData = data2.split()
+            msgType, msgData = data2.split(seperator1)
             print("messageType and message data are", msgType, msgData)
         except:
             print("Unable to receive data from the peer...")
-        time.sleep(3)
+        # time.sleep(3)
         # peerconn = PeerConnection(('', int(port)))
         if msgType not in self.handlers:
             print("Invalid message type")
@@ -56,14 +56,14 @@ class Peer2PeerNetwork():
 
         if msgType == "NAME":
             try:
-                (host, port) = msgData.split()
+                (host, port) = msgData.split(seperator2)
             except:
                 print("error in splitting data")
             peerconn = PeerConnection(peerAddress = (host, int(port)))
             self.handleName(peerconn)
         if msgType == "LIST":
             try:
-                (host, port) = msgData.split()
+                (host, port) = msgData.split(seperator2)
             except:
                 print("error in splitting data")
             peerconn = PeerConnection(peerAddress = (host, int(port)))
@@ -71,7 +71,7 @@ class Peer2PeerNetwork():
         if msgType == "JOIN":
             """ Assuming the msgData is of the form host pair """
             try:
-                host, port = msgData.split()
+                host, port = msgData.split(seperator2)
                 port = int(port)
                 peerconn = PeerConnection(peerAddress = (host, int(port)))
             except:
@@ -80,7 +80,7 @@ class Peer2PeerNetwork():
         if msgType == "QUER":
             """ Assuming the message is of the form queryFile ttl host port """
             try:
-                queryFile, ttl, host, port = msgData.split(":")
+                queryFile, ttl, host, port = msgData.split(seperator2)
                 port = int(port)
                 ttl = int(ttl)
                 peerconn = PeerConnection(peerAddress = (host, int(port)))
@@ -93,7 +93,7 @@ class Peer2PeerNetwork():
         if msgType == "FGET":
             """ Assuming the msgData is same as the filename """
             try:
-                (host, port, filename) = msgData.split()
+                (host, port, filename) = msgData.split(seperator2)
             except:
                 print("error in splitting data")
             peerconn = PeerConnection(peerAddress = (host, int(port)))
@@ -101,13 +101,13 @@ class Peer2PeerNetwork():
         if msgType == "QUIT":
             """ Assuming the msgData is of the form host port """
             try:
-                host, port = msgData.split()
+                host, port = msgData.split(seperator2)
                 port = int(port)
             except:
                 print("Invalid data format for Quit...")
             self.handleQuit(host, port)
         if msgType == "REPL":
-            fdata, filename = msgData.split("[saket,anil,abhishek]")
+            fdata, filename = msgData.split(seperator2)
             self.handleRepl(fdata, filename)
         if msgType == "ERRO":
             self.handleErro(msgData)
@@ -308,10 +308,11 @@ class Peer2PeerNetwork():
 
     def handleResp(self, data):
         """ Add the queried response file to to my dict of known files """
-        filename, host, port = data.split()
+        filename, host, port = data.split(seperator2)
         port = int(port)
-        fileDict = self.getDictOfFiles()
-        fileDict[filename] = (host, port)
+        # fileDict = self.getDictOfFiles()
+        self.peerFileTable[filename] = (host, port)
+        print("updated peer file table is ", self.peerFileTable)
         
     def handleFget(self, peerconn, filename):
         """ Sends the file to the peer """
@@ -343,7 +344,7 @@ class Peer2PeerNetwork():
     def handleRepl(self, fdata, filename):
         """ Saves the filedata to the file """
         print("Downloading the file %s", filename)
-        f = open(filename, "w")
+        f = open("./writeLocation/" + filename, "w")
         f.write(fdata)
         f.close()
         print("Downloaded the file...")
@@ -380,7 +381,7 @@ class Peer2PeerNetwork():
                     raise
             except:
                 print("Error receiving the response of the NAME query")
-            recvHoost, recvPort = msgData.split()
+            recvHoost, recvPort = msgData.split(seperator2)
             recvPort = int(recvPort)
             self.addPeer(self.GeneratePeerID(), (recvHoost, recvPort))
 
@@ -398,7 +399,7 @@ class Peer2PeerNetwork():
                     msgType, msgData = conn1.recvData()
                     if msgType != "REPL":
                         raise
-                    pid, recvHoost, recvPort = msgData.split()
+                    pid, recvHoost, recvPort = msgData.split(seperator2)
                     recvPort = int(recvPort)
                     self.addPeer(pid, (recvHoost, recvPort)) 
             except:
