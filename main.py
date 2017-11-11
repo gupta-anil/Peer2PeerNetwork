@@ -4,6 +4,7 @@ import sys
 import signal
 import struct
 import time
+import os
 
 maxLengthExceededError = "123"
 peerNotFound = "124"
@@ -28,25 +29,46 @@ class Peer2PeerNetwork():
 
 
     def handlePeerConnection(self, clientSocket, peerAddress):
-        (host, port) = peerAddress
-        peerconn = PeerConnection((host, port), sock = clientSocket)
+        # data = clientSocket.recv(1024)
+        # print("data is ", data)
+        # (host, port) = data.split()
+        # print("host and port are ",host, int(port))
+        # clientSocket.send("RCVD")
+        # peerconn = PeerConnection(clientSocket)
         try:
-            msgType, msgData = peerconn.recvData()
+            print("recieving data")
+            data2 = clientSocket.recv(1024)
+            msgType, msgData = data2.split()
+            print("messageType and message data are", msgType, msgData)
         except:
             print("Unable to receive data from the peer...")
+        time.sleep(3)
+        # peerconn = PeerConnection(('', int(port)))
         if msgType not in self.handlers:
             print("Invalid message type")
             return
         
+
         if msgType == "NAME":
+            try:
+                (host, port) = msgData.split()
+            except:
+                print("error in splitting data")
+            peerconn = PeerConnection(peerAddress = (host, int(port)))
             self.handleName(peerconn)
         if msgType == "LIST":
+            try:
+                (host, port) = msgData.split()
+            except:
+                print("error in splitting data")
+            peerconn = PeerConnection(peerAddress = (host, int(port)))
             self.handleList(peerconn)
         if msgType == "JOIN":
             """ Assuming the msgData is of the form host pair """
             try:
                 host, port = msgData.split()
                 port = int(port)
+                peerconn = PeerConnection(peerAddress = (host, int(port)))
             except:
                 print("Invalid message type for join...")
             self.handleJoin(peerconn, host, port)
@@ -56,14 +78,21 @@ class Peer2PeerNetwork():
                 queryFile, ttl, host, port = msgData.split()
                 port = int(port)
                 ttl = int(ttl)
+                peerconn = PeerConnection(peerAddress = (host, int(port)))
             except:
                 print("Invalid message type for Query...")
+
             self.handleQuer(peerconn, queryFile, ttl, host, port)
         if msgType == "RESP":
             self.handleResp(msgData)
         if msgType == "FGET":
             """ Assuming the msgData is same as the filename """
-            self.handleFget(peerconn, msgData)
+             try:
+                (host, port, filename) = msgData.split()
+            except:
+                print("error in splitting data")
+            peerconn = PeerConnection(peerAddress = (host, int(port)))
+            self.handleFget(peerconn, filename)
         if msgType == "QUIT":
             """ Assuming the msgData is of the form host port """
             try:
@@ -74,7 +103,7 @@ class Peer2PeerNetwork():
             self.handleQuit(host, port)
         if msgType == "REPL":
             fdata, filename = msgData.split("[saket,anil,abhishek]")
-            self.handleRepl(peerconn, fdata, filename)
+            self.handleRepl(fdata, filename)
         if msgType == "ERRO":
             self.handleErro(msgData)
             
@@ -105,8 +134,9 @@ class Peer2PeerNetwork():
         #     print("[peerConnection]  recieved data")
 
         # self.scheduler()
-        start_new_thread(self.scheduler,())
-            
+        self.initializeLocalFileTable()
+        # start_new_thread(self.scheduler,())
+        print("passed scheduler")
         while(1):
             try:
                 connection, peerAddress = sock.accept()
@@ -149,8 +179,9 @@ class Peer2PeerNetwork():
     def getPeerIds(self):
         return self.peers.keys()
 
-    def initializeLocalFileTable():
-        pass
+    def initializeLocalFileTable(self):
+        for i in os.listdir("./localFiles"):
+            self.localFileTable[i] = "./localFiles/" + str(i)
 
     def addToLocalFileTable(self,fileName,filePath):
         if not fileName in self.localFileTable:
@@ -162,7 +193,7 @@ class Peer2PeerNetwork():
             self.localFileTable.pop(fileName)
         
 
-    def initializePeerFileTable():
+    def initializePeerFileTable(self):
         pass
 
     def addToPeerFileTable(self, fileName, peerAddress):
@@ -264,7 +295,7 @@ class Peer2PeerNetwork():
             peerDict = self.getDictofPeers()
             for pid in peerDict:
                 (host, port) = peerDict[pid]
-                conn1 = PeerConnection(host, port)
+                conn1 = PeerConnection(peerAddress = (host, port))
                 conn1.sendData("QUER", msdData)
                 conn1.close()
                 # self.sendToPeer("Quer", host, port, msdData)
@@ -279,7 +310,7 @@ class Peer2PeerNetwork():
     def handleFget(self, peerconn, filename):
         """ Sends the file to the peer """
         try:
-            f = open(filename, "r")
+            f = open(self.localFileTable[filename], "r")
         except:
             print("File not found...")
         fdata = f.read()
@@ -303,7 +334,7 @@ class Peer2PeerNetwork():
             del peerDict[pid]
         return
 
-    def handleRepl(self, peerconn, fdata, filename):
+    def handleRepl(self, fdata, filename):
         """ Saves the filedata to the file """
         print("Downloading the file %s", filename)
         f = open(filename, "w")
@@ -332,7 +363,7 @@ class Peer2PeerNetwork():
         if self.getMaxPeers() >= self.getNumPeers():
             return
         try:
-            conn1 = PeerConnection(host, port)
+            conn1 = PeerConnection(peerAddress = (host, port))
             try:
                 conn1.sendData("NAME", "")
             except:
@@ -364,9 +395,9 @@ class Peer2PeerNetwork():
                     pid, recvHoost, recvPort = msgData.split()
                     recvPort = int(recvPort)
                     self.addPeer(pid, (recvHoost, recvPort)) 
-            conn1.close()
             except:
                 print("Error in receiving the peer List...")
+            conn1.close()
             
             myPeerDict = self.getDictofPeers()
             for pid in myPeerDict:
@@ -381,7 +412,7 @@ class Peer2PeerNetwork():
         print("in refreshPeerList")
         for i in self.peers:
             try:
-                conn = PeerConnection(self.peers[i])
+                conn = PeerConnection(peerAddress = self.peers[i])
                 print("connection still active", self.peers[i])
                 conn.close()
             except:
@@ -407,7 +438,7 @@ class GeneratePeerID():
         return self.id
 
 class PeerConnection():
-    def __init__(self, peerAddress, sock = None):
+    def __init__(self, peerAddress = None, sock = None):
         if sock:
             self.sock = sock
         else:
@@ -415,7 +446,7 @@ class PeerConnection():
             self.sock.connect(peerAddress)
 
     def sendData(self,msgType, data):
-        self.sock.sendall(str(msgType) + str(data))
+        self.sock.send(str(msgType) + str(data))
 
     def recvData(self):
         data = self.sock.recv(65535)
