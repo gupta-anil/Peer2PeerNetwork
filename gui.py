@@ -1,6 +1,6 @@
 import sys
 import threading
-
+import socket
 from Tkinter import *
 from random import *
 from main import *
@@ -19,9 +19,9 @@ class GUI(Frame):
         self.updatePeerFileList()
         self.p2pnetwork.addPeer(1,(host,port))
         self.updatePeerList()
-
-        # t = threading.Thread( target = self.p2pnetwork.main, args = [] )
-        # t.start()
+        print "Thread to Be started"
+        t = threading.Thread( target = self.p2pnetwork.main, args = [] )
+        t.start()
 
     def updatePeerList( self ):
         if self.peerList.size() > 0:
@@ -64,9 +64,15 @@ class GUI(Frame):
       print key
 
       for p in self.p2pnetwork.getPeerIds():
-        print p
-        # self.btpeer.sendtopeer( p, 
-                                 # QUERY, "%s %s 4" % ( self.btpeer.myid, key ) )
+        print self.p2pnetwork.myId
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect(('',1234))
+        sock.send("ERRO sending error msg")
+        # peerconn = PeerConnection(peerAddress = self.p2pnetwork.myId)
+        # time.sleep(2)
+        # # peerconn = self.p2pnetwork.PeerConnection(peerAddress = self.myId)
+        # peerconn.sendData("QUER",key+" 2"+" "+self.p2pnetwork.host+" "+str(self.p2pnetwork.port))
+        # self.p2pnetwork.sendtopeer( p, QUERY, "%s %s 4" % ( self.btpeer.myid, key ) )
 
 
     def onFetch(self):
