@@ -1,3 +1,4 @@
+from __future__ import print_function
 import socket
 from thread import *
 import sys
@@ -5,7 +6,6 @@ import signal
 import struct
 import time
 import os
-
 
 seperator1 = "#"
 seperator2 = "$"
@@ -343,7 +343,7 @@ class Peer2PeerNetwork():
 
     def handleRepl(self, fdata, filename):
         """ Saves the filedata to the file """
-        print("Downloading the file %s", filename)
+        print("Downloading the file %s" %filename)
         f = open("./writeLocation/" + filename, "w")
         f.write(fdata)
         f.close()
