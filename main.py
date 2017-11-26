@@ -41,10 +41,13 @@ class Peer2PeerNetwork():
         # peerconn = PeerConnection(clientSocket)
         try:
             print("recieving data")
-            data2 = clientSocket.recv(1024)
-            print("data2 is ", data2)
-            msgType, msgData = data2.split(seperator1)
+            peerconn = PeerConnection(peerAddress = peerAddress, sock = clientSocket)
+            # data2 = clientSocket.recv(1024)
+            (msgType, msgData) = peerconn.recvData()
+            # print("data2 is ", data2)
+            # msgType, msgData = data2.split(seperator1)
             print("messageType and message data are", msgType, msgData)
+            peerconn.close()
         except:
             print("Unable to receive data from the peer...")
         # time.sleep(3)
@@ -320,13 +323,15 @@ class Peer2PeerNetwork():
             f = open(self.localFileTable[filename], "r")
         except:
             print("File not found...")
-        fdata = f.read()
-        fdata += seperator2
-        fdata += filename
-        try:
-            peerconn.sendData("REPL", fdata)
-        except:
-            print("Error in sending the file data to peer...")
+        fdata = f.read(1024)
+        while fdata != "":
+            fdata += seperator2
+            fdata += filename
+            try:
+                peerconn.sendData("REPL", fdata)
+            except:
+                print("Error in sending the file data to peer...")
+            fdata = f.read(1024)
         f.close()
 
     def handleQuit(self, host, port):
@@ -344,7 +349,7 @@ class Peer2PeerNetwork():
     def handleRepl(self, fdata, filename):
         """ Saves the filedata to the file """
         print("Downloading the file %s" %filename)
-        f = open("./writeLocation/" + filename, "w")
+        f = open("./writeLocation/" + filename, "a")
         f.write(fdata)
         f.close()
         print("Downloaded the file...")
@@ -450,14 +455,26 @@ class PeerConnection():
             self.sock = sock
         else:
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            print("Opening socket to peerAddress:",peerAddress)
+            self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR,1)
             self.sock.connect(peerAddress)
 
     def sendData(self,msgType, data):
+        print("Sending data...")
         self.sock.send(str(msgType) + seperator1 + str(data))
+        print("Data sent. Waiting for ack...")
+        self.sock.recv(1)
+        print("Ack received....")
 
     def recvData(self):
+        print("Receiving Data...")
         data = self.sock.recv(65535)
-        return (data[0:4], data[4:])
+        print("Data received. Sending Ack...")
+        self.sock.send("A")
+        print("Ack sent...")
+        tmp = (data[0:4], data[5:])
+        print("Data returned is: ",tmp)
+        return tmp
 
     def close(self):
         self.sock.close()
