@@ -28,9 +28,8 @@ class Peer2PeerNetwork():
         self.peerIdGenerator = GeneratePeerID()
         self.localFileTable = {} # contains tuple fileName, file path, 
         self.peerFileTable = {} # stores the tuple fileName, list of peers having the file
-        self.handlers = {"NAME":self.handleName, "LIST":self.handleList, "JOIN":self.handleJoin, "QUER":self.handleQuer, "RESP":self.handleResp, "FGET":self.handleFget, "QUIT":self.handleQuit, "REPL":self.handleRepl, "ERRO":self.handleErro}
+        self.handlers = {"NAME":self.handleName, "LIST":self.handleList, "JOIN":self.handleJoin, "QUER":self.handleQuer, "RESP":self.handleResp, "FGET":self.handleFget, "QUIT":self.handleQuit, "REPL":self.handleRepl, "ERRO":self.handleErro, "RLPL":self.handleRlpl}
         self.myId = (self.host, self.port)
-
 
     def handlePeerConnection(self, clientSocket, peerAddress):
         # data = clientSocket.recv(1024)
@@ -42,20 +41,17 @@ class Peer2PeerNetwork():
         try:
             print("recieving data")
             peerconn = PeerConnection(peerAddress = peerAddress, sock = clientSocket)
-            # data2 = clientSocket.recv(1024)
             (msgType, msgData) = peerconn.recvData()
-            # print("data2 is ", data2)
-            # msgType, msgData = data2.split(seperator1)
             print("messageType and message data are", msgType, msgData)
-            peerconn.close()
+            if msgType != "REPL" and msgType != "RLPL":
+                print ("Connection closed as msgType is %s..."%msgType)
+                peerconn.close()
         except:
             print("Unable to receive data from the peer...")
-        # time.sleep(3)
-        # peerconn = PeerConnection(('', int(port)))
+
         if msgType not in self.handlers:
             print("Invalid message type")
             return
-        
 
         if msgType == "NAME":
             try:
@@ -64,6 +60,7 @@ class Peer2PeerNetwork():
                 print("error in splitting data")
             peerconn = PeerConnection(peerAddress = (host, int(port)))
             self.handleName(peerconn)
+
         if msgType == "LIST":
             try:
                 (host, port) = msgData.split(seperator2)
@@ -71,6 +68,7 @@ class Peer2PeerNetwork():
                 print("error in splitting data")
             peerconn = PeerConnection(peerAddress = (host, int(port)))
             self.handleList(peerconn)
+        
         if msgType == "JOIN":
             """ Assuming the msgData is of the form host pair """
             try:
@@ -80,6 +78,7 @@ class Peer2PeerNetwork():
             except:
                 print("Invalid message type for join...")
             self.handleJoin(peerconn, host, port)
+        
         if msgType == "QUER":
             """ Assuming the message is of the form queryFile ttl host port """
             try:
@@ -89,18 +88,20 @@ class Peer2PeerNetwork():
                 peerconn = PeerConnection(peerAddress = (host, int(port)))
             except:
                 print("Invalid message type for Query...")
-
             self.handleQuer(peerconn, queryFile, ttl, host, port)
+
         if msgType == "RESP":
             self.handleResp(msgData)
+
         if msgType == "FGET":
-            """ Assuming the msgData is same as the filename """
+            """ Assuming the msgData is host, port, filename """
             try:
                 (host, port, filename) = msgData.split(seperator2)
             except:
                 print("error in splitting data")
             peerconn = PeerConnection(peerAddress = (host, int(port)))
             self.handleFget(peerconn, filename)
+
         if msgType == "QUIT":
             """ Assuming the msgData is of the form host port """
             try:
@@ -109,12 +110,16 @@ class Peer2PeerNetwork():
             except:
                 print("Invalid data format for Quit...")
             self.handleQuit(host, port)
+
         if msgType == "REPL":
             fdata, filename = msgData.split(seperator2)
-            self.handleRepl(fdata, filename)
+            self.handleRepl(fdata, filename, peerconn)
+
         if msgType == "ERRO":
             self.handleErro(msgData)
-            
+
+        if msgType == "RLPL":
+            self.handleRlpl(peerconn, int(msgData))         
 
     def main(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -201,7 +206,6 @@ class Peer2PeerNetwork():
         if fileName in self.localFileTable:
             self.localFileTable.pop(fileName)
         
-
     def initializePeerFileTable(self):
         pass
 
@@ -238,32 +242,42 @@ class Peer2PeerNetwork():
     def getMyPort(self):
         return self.port
 
+    # Useless message type. Why do we need this type?
+    # def handleName(self, peerconn):  # [TODO]
+    #     """ Returns the official peerID """
+    #     try:
+    #         peerconn.sendData("REPL", "%s%s%d"%(self.myId[0], seperator2, self.myId[1]))
+    #     except:
+    #         print("Error in sending myId in handleName...")
+    #     peerconn.close()
 
-
-
-
-
-    def handleName(self, peerconn):  # [TODO]
-        """ Returns the official peerID """
-        try:
-            peerconn.sendData("REPL", "%s%s%d"%(self.myId[0], seperator2, self.myId[1]))
-        except:
-            print("Error in sending myId in handleName...")
-
-    def handleList(self, peerconn):  # [TODO]
+    def handleList(self, peerconn):
         """ Returns the list of known peers """
         try:
-            peerconn.sendData("REPL", "%d"%(self.getNumPeers()))
+            peerconn.sendData("RLPL", "%d"%(self.getNumPeers()))
         except:
             print("Error in sending number of known peers...")
         peerList = self.getDictofPeers() # peerId -> (host, port) mapping dictionary
         for pid in peerList:
             (host, port) = peerList[pid]
             try:
-                peerconn.sendData("REPL", "%s%s%s%s%d"%(pid, seperator2, host, seperator2, port))
+                peerconn.sendData("RLPL", "%s%s%s%s%d"%(pid, seperator2, host, seperator2, port))
             except:
                 print("Error in sending the peer List data in handleList...")
+        peerconn.close()
     
+    def handleRlpl(self, peerconn, npeersToRecv):
+        """ Handles the reply of the List query send to the peer """
+        for i in range(npeersToRecv):
+            try:
+                msgType, msgData = peerconn.recvData()
+                assert(msgType == "RLPL")
+                pid, host, port = msgData.split(seperator2)
+                self.addPeer(pid, (host, port))
+            except:
+                print("Error in receiving the peer's file table...")
+        peerconn.close()
+
     def handleJoin(self, peerconn, host, port):
         """ Adds the given peer to it's list of known peers """
         peerList = self.getDictofPeers()
@@ -274,6 +288,7 @@ class Peer2PeerNetwork():
                 print("Cannot send the error message that maximum number of peers reached...")
             return
         self.addPeer(self.peerIdGenerator.getID() ,(host, port)) # [TODO]
+        peerconn.close()        
     
     def handleQuer(self, peerconn, queryFile, ttl, host, port):
         """ Returns whether it has the required files."""
@@ -287,6 +302,7 @@ class Peer2PeerNetwork():
                 break
         if foundHost != None:
             peerconn.sendData("RESP", "%s%s%s%s%d"%(filename, seperator2,foundHost, seperator2,foundPort))
+            peerconn.close()
             return
 
         for filename in fileDict:
@@ -296,8 +312,9 @@ class Peer2PeerNetwork():
         
         if foundHost != None:
             peerconn.sendData("RESP", "%s%s%s%s%d"%(filename, seperator2,foundHost, seperator2,foundPort))
+            peerconn.close()
             return
-
+        peerconn.close()
         # Coming here means no idea about the file. So broadcasting to neighbouring peers for the file
         if ttl > 0:
             msdData = "%s%s%d%s%s%s%d"%(queryFile, seperator2, ttl-1, seperator2, host, seperator2, port)
@@ -323,7 +340,7 @@ class Peer2PeerNetwork():
             f = open(self.localFileTable[filename], "r")
         except:
             print("File not found...")
-        fdata = f.read(1024)
+        fdata = f.read(3)
         while fdata != "":
             fdata += seperator2
             fdata += filename
@@ -332,7 +349,32 @@ class Peer2PeerNetwork():
             except:
                 print("Error in sending the file data to peer...")
             fdata = f.read(1024)
+        peerconn.sendData("REPL", "EndOfFile")
+        peerconn.close()
         f.close()
+        
+    def handleRepl(self, fdata, filename, peerconn):
+        """ Saves the filedata to the file """
+        print("Downloading the file %s" %filename)
+        f = open("./writeLocation/" + filename, "a")
+        f.write(fdata)
+        msgType, msgData = peerconn.recvData()
+        while msgData != "EndOfFile":
+            msgData,t = msgData.split(seperator2)
+            f.write(msgData)
+            msgType, msgData = peerconn.recvData()
+        peerconn.close()
+        f.close()
+        print("Downloaded the file...")
+        ownFileList = self.getOwnFileList()
+        found = False
+        for file in ownFileList:
+            if file == filename:
+                found = True
+                break
+        if found == False:
+            ownFileList.append(filename)
+            print("Added the file %s to my local list of files..."%filename)
 
     def handleQuit(self, host, port):
         """ Removes the host, port peer from list of known peers """
@@ -345,23 +387,6 @@ class Peer2PeerNetwork():
         if pid != None:
             del peerDict[pid]
         return
-
-    def handleRepl(self, fdata, filename):
-        """ Saves the filedata to the file """
-        print("Downloading the file %s" %filename)
-        f = open("./writeLocation/" + filename, "a")
-        f.write(fdata)
-        f.close()
-        print("Downloaded the file...")
-        ownFileList = self.getOwnFileList()
-        found = False
-        for file in ownFileList:
-            if file == filename:
-                found = True
-                break
-        if found == False:
-            ownFileList.append(filename)
-            print("Added the file %s to my local list of files..."%filename)
 
     def handleErro(self, error):
         """ Prints the error """
